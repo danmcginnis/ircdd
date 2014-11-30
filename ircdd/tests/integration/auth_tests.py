@@ -16,55 +16,80 @@ class TestIRCDDAuth:
                               host=integration.HOST,
                               port=integration.PORT)
 
-        config = dict(nsqd_tcp_address=["127.0.0.1:4150"],
-                      lookupd_http_address=["127.0.0.1:4161"],
-                      hostname="testserver",
-                      group_on_request=True,
-                      user_on_request=True,
-                      db=integration.DB,
-                      rdb_host=integration.HOST,
-                      rdb_port=integration.PORT
-                      )
-        self.ctx = makeContext(config)
+        self.nodes = 3
 
-        self.ctx["db"].createUser("john", password="pw", registered=True)
-        self.ctx["db"].createUser("jane", password="pw2", registered=True)
-        self.ctx["db"].createUser("jill", password="pw3", registered=True)
+        self.configs = []
+        self.ctx = []
+        self.factories = []
+        self.protocols = []
 
-        self.factory = IRCDDFactory(self.ctx)
-        self.protocol = self.factory.buildProtocol(("127.0.0.1", 0))
-        self.transport = proto_helpers.StringTransport()
-        self.protocol.makeConnection(self.transport)
+        for node in xrange(0, self.nodes):
+            config = dict(nsqd_tcp_address=["127.0.0.1:4150"],
+                          lookupd_http_address=["127.0.0.1:4161"],
+                          hostname="testserver %d",
+                          group_on_request=True,
+                          user_on_request=True,
+                          db=integration.DB,
+                          rdb_host=integration.HOST,
+                          rdb_port=integration.PORT
+                          )
+            self.configs.append(config)
+
+            ctx = makeContext(config)
+            self.ctx.append(ctx)
+
+            factory = IRCDDFactory(ctx)
+            self.factories.append(factory)
+
+            protocol = factory.buildProtocol(("127.0.0.%d" % node, 0))
+            self.protocols.append(protocol)
+
+            transport = proto_helpers.StringTransport()
+            self.transports.append(transport)
+
+            protocol.makeConnection(transport)
 
     def tearDown(self):
-        self.transport.loseConnection()
-        self.protocol.connectionLost(None)
+        for transport in self.transports:
+            transport.loseConnection()
+        self.transports = None
+
+        for protocol in self.protocols:
+            protocol.connectionLost(None)
+        self.protocols = None
+
+        self.factories = None
+        self.configs = None
+
+        for ctx in self.ctx:
+            ctx.db.conn.close()
+        self.ctx = None
+
+        for topic in _topics("127.0.0.1:4161"):
+            _delete_topic(topic, "127.0.0.1:4161")
 
         integration.cleanTables()
 
         self.conn.close()
 
-        for topic in _topics(self.ctx["lookupd_http_address"]):
-            for chan in _channels(topic, self.ctx["lookupd_http_address"]):
-                _delete_channel(topic, chan, self.ctx["lookupd_http_address"])
-            _delete_topic(topic, self.ctx["lookupd_http_address"])
-
-        self.ctx["db"].conn.close()
-        self.ctx = None
-
-    def getResponse(self):
-        response = self.protocol.transport.value().splitlines()
-        self.protocol.transport.clear()
+    def getResponse(self, protocol):
+        response = protocol.transport.value().splitlines()
+        protocol.transport.clear()
         return map(irc.parsemsg, response)
 
     def test_anon_login(self):
-        self.protocol.irc_NICK("", ["anonuser"])
+        node = 0
+
+        protocol = self.protocols[node]
+        factory = self.factories[node]
+
+        protocol.irc_NICK("", ["anonuser"])
 
         version = ("Your host is testserver, running version %s" %
-                   (self.factory._serverInfo["serviceVersion"]))
+                   (factory._serverInfo["serviceVersion"]))
 
         creation = ("This server was created on %s" %
-                    (self.factory._serverInfo["creationDate"]))
+                    (factory._serverInfo["creationDate"]))
 
         expected = [("testserver", "375",
                     ["anonuser", "- testserver Message of the Day - "]),
@@ -76,9 +101,9 @@ class TestIRCDDAuth:
                     ("testserver", "003", ["anonuser", creation]),
                     ("testserver", "004",
                     ["anonuser", "testserver",
-                     self.factory._serverInfo["serviceVersion"], "w", "n"])]
+                     factory._serverInfo["serviceVersion"], "w", "n"])]
 
-        response = self.getResponse()
+        response = self.getResponse(protocol)
         assert response == expected
 
     def test_registered_login(self):
@@ -86,15 +111,22 @@ class TestIRCDDAuth:
         Connecting to the server, sending /pass <pw>,
         then /nick <name> logs the registered user in.
         """
+        node = 0
 
-        self.protocol.irc_PASS("", ["pw"])
-        self.protocol.irc_NICK("", ["john"])
+        ctx = self.ctx[node]
+        ctx.db.createUser("john", password="pw", registered=True)
+
+        protocol = self.protocols[node]
+        protocol.irc_PASS("", ["pw"])
+        protocol.irc_NICK("", ["john"])
+
+        factory = self.factories[node]
 
         version = ("Your host is testserver, running version %s" %
-                   (self.factory._serverInfo["serviceVersion"]))
+                   (factory._serverInfo["serviceVersion"]))
 
         creation = ("This server was created on %s" %
-                    (self.factory._serverInfo["creationDate"]))
+                    (factory._serverInfo["creationDate"]))
 
         expected = [("testserver", "375",
                     ["john", "- testserver Message of the Day - "]),
@@ -106,22 +138,26 @@ class TestIRCDDAuth:
                     ("testserver", "003", ["john", creation]),
                     ("testserver", "004",
                     ["john", "testserver",
-                     self.factory._serverInfo["serviceVersion"], "w", "n"])]
+                     factory._serverInfo["serviceVersion"], "w", "n"])]
 
-        response = self.getResponse()
+        response = self.getResponse(protocol)
         assert response == expected
 
     def test_anon_login_create_fail(self):
-        self.ctx["realm"].createUserOnRequest = False
+        node = 0
 
-        self.protocol.irc_PASS("", ["password"])
-        self.protocol.irc_NICK("", ["anonuser"])
+        ctx = self.ctx[node]
+        ctx.realm.createUserOnRequest = False
 
+        protocol = self.protocols[node]
+        protocol.irc_NICK("", ["anonuser"])
+
+        factory = self.factories[node]
         version = ("Your host is testserver, running version %s" %
-                   (self.factory._serverInfo["serviceVersion"]))
+                   (factory._serverInfo["serviceVersion"]))
 
         creation = ("This server was created on %s" %
-                    (self.factory._serverInfo["creationDate"]))
+                    (factory._serverInfo["creationDate"]))
 
         expected = [("testserver", "375",
                     ["anonuser", "- testserver Message of the Day - "]),
@@ -133,21 +169,24 @@ class TestIRCDDAuth:
                     ("testserver", "003", ["anonuser", creation]),
                     ("testserver", "004",
                     ["anonuser", "testserver",
-                     self.factory._serverInfo["serviceVersion"], "w", "n"])]
+                     factory._serverInfo["serviceVersion"], "w", "n"])]
 
-        response = self.getResponse()
+        response = self.getResponse(protocol)
         # Improve this to expect a specific error output
         assert response != expected
 
     def test_anon_login_nick_taken_fail(self):
-        self.protocol.irc_PASS("", ["password"])
-        self.protocol.irc_NICK("", ["anonuser"])
+        node = 0
 
+        protocol = self.protocols[node]
+        protocol.irc_NICK("", ["anonuser"])
+
+        factory = self.factories[node]
         version = ("Your host is testserver, running version %s" %
-                   (self.factory._serverInfo["serviceVersion"]))
+                   (factory._serverInfo["serviceVersion"]))
 
         creation = ("This server was created on %s" %
-                    (self.factory._serverInfo["creationDate"]))
+                    (factory._serverInfo["creationDate"]))
 
         expected = [("testserver", "375",
                     ["anonuser", "- testserver Message of the Day - "]),
@@ -159,13 +198,12 @@ class TestIRCDDAuth:
                     ("testserver", "003", ["anonuser", creation]),
                     ("testserver", "004",
                     ["anonuser", "testserver",
-                     self.factory._serverInfo["serviceVersion"], "w", "n"])]
+                     factory._serverInfo["serviceVersion"], "w", "n"])]
 
-        response = self.getResponse()
+        response = self.getResponse(protocol)
         assert response == expected
 
-        self.protocol.irc_PASS("", ["password"])
-        self.protocol.irc_NICK("", ["anonuser"])
+        protocol.irc_NICK("", ["anonuser"])
 
         expected = [('testserver', '375',
                      ['anonuser', '- testserver Message of the Day - ']),
@@ -174,13 +212,19 @@ class TestIRCDDAuth:
                     ('NickServ!NickServ@services', 'PRIVMSG',
                      ['anonuser', 'Already logged in.  No pod people allowed!']
                      )]
-        response_fail = self.getResponse()
+        response_fail = self.getResponse(protocol)
 
         assert response_fail == expected
 
     def test_registered_login_pw_fail(self):
-        self.protocol.irc_PASS("", ["bad_password"])
-        self.protocol.irc_NICK("", ["john"])
+        node = 0
+
+        ctx = self.ctx[node]
+        ctx.db.createUser("john", password="pw", registered=True)
+
+        protocol = self.protocol[node]
+        protocol.irc_PASS("", ["bad_password"])
+        protocol.irc_NICK("", ["john"])
 
         expected = [('testserver', '375',
                     ['john', '- testserver Message of the Day - ']),
@@ -188,5 +232,5 @@ class TestIRCDDAuth:
                     ('NickServ!NickServ@services', 'PRIVMSG',
                     ['john', 'Login failed.  Goodbye.'])]
 
-        response = self.getResponse()
+        response = self.getResponse(protocol)
         assert response == expected

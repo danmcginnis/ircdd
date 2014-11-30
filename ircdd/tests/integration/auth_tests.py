@@ -4,8 +4,8 @@ from twisted.test import proto_helpers
 from twisted.words.protocols import irc
 
 from ircdd.server import IRCDDFactory
-from ircdd.remote import _channels, _topics
-from ircdd.remote import _delete_channel, _delete_topic
+from ircdd.remote import _topics
+from ircdd.remote import _delete_topic
 from ircdd.context import makeContext
 from ircdd.tests import integration
 
@@ -22,11 +22,12 @@ class TestIRCDDAuth:
         self.ctx = []
         self.factories = []
         self.protocols = []
+        self.transports = []
 
         for node in xrange(0, self.nodes):
             config = dict(nsqd_tcp_address=["127.0.0.1:4150"],
                           lookupd_http_address=["127.0.0.1:4161"],
-                          hostname="testserver %d",
+                          hostname="testserver%s" % node,
                           group_on_request=True,
                           user_on_request=True,
                           db=integration.DB,
@@ -41,7 +42,7 @@ class TestIRCDDAuth:
             factory = IRCDDFactory(ctx)
             self.factories.append(factory)
 
-            protocol = factory.buildProtocol(("127.0.0.%d" % node, 0))
+            protocol = factory.buildProtocol(("127.0.0.1", 0))
             self.protocols.append(protocol)
 
             transport = proto_helpers.StringTransport()
@@ -65,8 +66,8 @@ class TestIRCDDAuth:
             ctx.db.conn.close()
         self.ctx = None
 
-        for topic in _topics("127.0.0.1:4161"):
-            _delete_topic(topic, "127.0.0.1:4161")
+        for topic in _topics(["127.0.0.1:4161"]):
+            _delete_topic(topic, ["127.0.0.1:4161"])
 
         integration.cleanTables()
 
@@ -82,25 +83,25 @@ class TestIRCDDAuth:
 
         protocol = self.protocols[node]
         factory = self.factories[node]
+        hostname = factory.ctx.hostname
 
         protocol.irc_NICK("", ["anonuser"])
 
-        version = ("Your host is testserver, running version %s" %
-                   (factory._serverInfo["serviceVersion"]))
+        version = ("Your host is %s, running version %s" %
+                   (hostname, factory._serverInfo["serviceVersion"]))
 
         creation = ("This server was created on %s" %
                     (factory._serverInfo["creationDate"]))
-
-        expected = [("testserver", "375",
-                    ["anonuser", "- testserver Message of the Day - "]),
-                    ("testserver", "376",
+        expected = [(hostname, "375",
+                    ["anonuser", "- %s Message of the Day - " % hostname]),
+                    (hostname, "376",
                     ["anonuser", "End of /MOTD command."]),
-                    ("testserver", "001",
+                    (hostname, "001",
                     ["anonuser", "connected to Twisted IRC"]),
-                    ("testserver", "002", ["anonuser", version]),
-                    ("testserver", "003", ["anonuser", creation]),
-                    ("testserver", "004",
-                    ["anonuser", "testserver",
+                    (hostname, "002", ["anonuser", version]),
+                    (hostname, "003", ["anonuser", creation]),
+                    (hostname, "004",
+                    ["anonuser", hostname,
                      factory._serverInfo["serviceVersion"], "w", "n"])]
 
         response = self.getResponse(protocol)
@@ -121,23 +122,23 @@ class TestIRCDDAuth:
         protocol.irc_NICK("", ["john"])
 
         factory = self.factories[node]
+        hostname = factory.ctx.hostname
 
-        version = ("Your host is testserver, running version %s" %
-                   (factory._serverInfo["serviceVersion"]))
+        version = ("Your host is %s, running version %s" %
+                   (hostname, factory._serverInfo["serviceVersion"]))
 
         creation = ("This server was created on %s" %
                     (factory._serverInfo["creationDate"]))
-
-        expected = [("testserver", "375",
-                    ["john", "- testserver Message of the Day - "]),
-                    ("testserver", "376",
+        expected = [(hostname, "375",
+                    ["john", "- %s Message of the Day - " % hostname]),
+                    (hostname, "376",
                     ["john", "End of /MOTD command."]),
-                    ("testserver", "001",
+                    (hostname, "001",
                     ["john", "connected to Twisted IRC"]),
-                    ("testserver", "002", ["john", version]),
-                    ("testserver", "003", ["john", creation]),
-                    ("testserver", "004",
-                    ["john", "testserver",
+                    (hostname, "002", ["john", version]),
+                    (hostname, "003", ["john", creation]),
+                    (hostname, "004",
+                    ["john", hostname,
                      factory._serverInfo["serviceVersion"], "w", "n"])]
 
         response = self.getResponse(protocol)
@@ -153,22 +154,23 @@ class TestIRCDDAuth:
         protocol.irc_NICK("", ["anonuser"])
 
         factory = self.factories[node]
-        version = ("Your host is testserver, running version %s" %
-                   (factory._serverInfo["serviceVersion"]))
+        hostname = factory.ctx.hostname
+
+        version = ("Your host is %s, running version %s" %
+                   (hostname, factory._serverInfo["serviceVersion"]))
 
         creation = ("This server was created on %s" %
                     (factory._serverInfo["creationDate"]))
-
-        expected = [("testserver", "375",
-                    ["anonuser", "- testserver Message of the Day - "]),
-                    ("testserver", "376",
+        expected = [(hostname, "375",
+                    ["anonuser", "- %s Message of the Day - " % hostname]),
+                    (hostname, "376",
                     ["anonuser", "End of /MOTD command."]),
-                    ("testserver", "001",
+                    (hostname, "001",
                     ["anonuser", "connected to Twisted IRC"]),
-                    ("testserver", "002", ["anonuser", version]),
-                    ("testserver", "003", ["anonuser", creation]),
-                    ("testserver", "004",
-                    ["anonuser", "testserver",
+                    (hostname, "002", ["anonuser", version]),
+                    (hostname, "003", ["anonuser", creation]),
+                    (hostname, "004",
+                    ["anonuser", hostname,
                      factory._serverInfo["serviceVersion"], "w", "n"])]
 
         response = self.getResponse(protocol)
@@ -176,43 +178,50 @@ class TestIRCDDAuth:
         assert response != expected
 
     def test_anon_login_nick_taken_fail(self):
-        node = 0
+        success_node = 0
 
-        protocol = self.protocols[node]
+        protocol = self.protocols[success_node]
         protocol.irc_NICK("", ["anonuser"])
 
-        factory = self.factories[node]
-        version = ("Your host is testserver, running version %s" %
-                   (factory._serverInfo["serviceVersion"]))
+        factory = self.factories[success_node]
+        hostname = factory.ctx.hostname
+
+        version = ("Your host is %s, running version %s" %
+                   (hostname, factory._serverInfo["serviceVersion"]))
 
         creation = ("This server was created on %s" %
                     (factory._serverInfo["creationDate"]))
-
-        expected = [("testserver", "375",
-                    ["anonuser", "- testserver Message of the Day - "]),
-                    ("testserver", "376",
+        expected = [(hostname, "375",
+                    ["anonuser", "- %s Message of the Day - " % hostname]),
+                    (hostname, "376",
                     ["anonuser", "End of /MOTD command."]),
-                    ("testserver", "001",
+                    (hostname, "001",
                     ["anonuser", "connected to Twisted IRC"]),
-                    ("testserver", "002", ["anonuser", version]),
-                    ("testserver", "003", ["anonuser", creation]),
-                    ("testserver", "004",
-                    ["anonuser", "testserver",
+                    (hostname, "002", ["anonuser", version]),
+                    (hostname, "003", ["anonuser", creation]),
+                    (hostname, "004",
+                    ["anonuser", hostname,
                      factory._serverInfo["serviceVersion"], "w", "n"])]
 
         response = self.getResponse(protocol)
         assert response == expected
 
-        protocol.irc_NICK("", ["anonuser"])
+        fail_node = 1
+        fail_protocol = self.protocols[fail_node]
+        fail_protocol.irc_NICK("", ["anonuser"])
 
-        expected = [('testserver', '375',
-                     ['anonuser', '- testserver Message of the Day - ']),
-                    ('testserver', '376',
+        fail_factory = self.factories[fail_node]
+        fail_hostname = fail_factory.ctx.hostname
+
+        expected = [(fail_hostname, '375',
+                     ['anonuser', '- %s Message of the Day - ' %
+                         fail_hostname]),
+                    (fail_hostname, '376',
                      ['anonuser', 'End of /MOTD command.']),
                     ('NickServ!NickServ@services', 'PRIVMSG',
                      ['anonuser', 'Already logged in.  No pod people allowed!']
                      )]
-        response_fail = self.getResponse(protocol)
+        response_fail = self.getResponse(fail_protocol)
 
         assert response_fail == expected
 
@@ -222,13 +231,16 @@ class TestIRCDDAuth:
         ctx = self.ctx[node]
         ctx.db.createUser("john", password="pw", registered=True)
 
-        protocol = self.protocol[node]
+        protocol = self.protocols[node]
         protocol.irc_PASS("", ["bad_password"])
         protocol.irc_NICK("", ["john"])
 
-        expected = [('testserver', '375',
-                    ['john', '- testserver Message of the Day - ']),
-                    ('testserver', '376', ['john', 'End of /MOTD command.']),
+        factory = self.factories[node]
+        hostname = factory.ctx.hostname
+
+        expected = [(hostname, '375',
+                    ['john', '- %s Message of the Day - ' % hostname]),
+                    (hostname, '376', ['john', 'End of /MOTD command.']),
                     ('NickServ!NickServ@services', 'PRIVMSG',
                     ['john', 'Login failed.  Goodbye.'])]
 

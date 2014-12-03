@@ -115,7 +115,7 @@ class TestIRCDDatabase():
         assert channel['meta']['topic'] == 'test'
         assert channel['meta']['topic_time']
         assert channel['meta']['topic_author'] == 'john_doe'
-    
+
     def test_floodSetGroupData(self):
         self.db.createGroup('test_channel', 'public')
         channel = self.db.lookupGroup('test_channel')

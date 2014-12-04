@@ -40,4 +40,3 @@ Credits
    
 :Github:
    `Repo <https://github.com/kzvezdarov/ircdd>`_
-

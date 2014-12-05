@@ -30,6 +30,10 @@ if [ ! -d "/data/rethinkdb_data" ]; then
     echo "[rdb] starting rdb..."
     rethinkdb serve --config-file /etc/rethinkdb/rethinkdb.conf --canonical-address $HOST_IP --daemon
 
+    while [ ! -d "/data/rethinkdb_data" ]; do
+        sleep 1;
+    done
+
     echo "[rdb] importing base data..."
     rethinkdb import -d /etc/rethinkdb_base -c $HOST_IP:28015
 else

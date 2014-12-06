@@ -2,7 +2,7 @@ import rethinkdb as r
 from ircdd import database
 
 from ircdd.tests import integration
-from testfixtures import ShouldRaise
+import unittest
 
 
 class TestIRCDDatabase():
@@ -218,7 +218,7 @@ class TestIRCDDatabase():
     def test_checkIfBadNickname(self):
         nickname = "@3"
 
-        assertRaises(ValueError, self.db.checkIfValidNickname, nickname)
+        unittest.assertRaises(ValueError, self.db.checkIfValidNickname, nickname)
 
     def test_checkIfValidPassword(self):
         password = "goodPassword2"

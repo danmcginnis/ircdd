@@ -17,6 +17,7 @@ Contents:
    security
    database
    functions
+   apidocs
    recovery
    errors
    troubleshoot

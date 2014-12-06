@@ -2,6 +2,7 @@ import rethinkdb as r
 from ircdd import database
 
 from ircdd.tests import integration
+from testfixtures import ShouldRaise
 
 
 class TestIRCDDatabase():
@@ -65,6 +66,34 @@ class TestIRCDDatabase():
         user = self.db.lookupUser('test_user')
         assert user is None
 
+    def test_floodDeleteUser(self):
+        self.db.createUser('test_user')
+        user = self.db.lookupUser('test_user')
+        assert user['nickname'] == 'test_user'
+        assert user['email'] == ''
+        assert user['password'] == ''
+        assert not user['registered']
+        assert user['permissions'] == {}
+
+        self.db.deleteUser('test_user')
+        self.db.createUser('test_user')
+        self.db.deleteUser('test_user')
+        self.db.createUser('test_user')
+        self.db.deleteUser('test_user')
+        self.db.createUser('test_user')
+        self.db.deleteUser('test_user')
+        self.db.createUser('test_user')
+        self.db.deleteUser('test_user')
+        self.db.createUser('test_user')
+        self.db.deleteUser('test_user')
+        self.db.createUser('test_user')
+        self.db.deleteUser('test_user')
+        self.db.createUser('test_user')
+        self.db.deleteUser('test_user')
+
+        user = self.db.lookupUser('test_user')
+        assert user is None
+
     def test_setPermission(self):
         self.db.createUser('test_user', 'user@test.dom', 'pass', True)
         user = self.db.lookupUser('test_user')
@@ -102,6 +131,37 @@ class TestIRCDDatabase():
         state = self.db.getGroupState("test_channel")
         assert state is None
 
+    def test_floodDeleteGroup(self):
+        self.db.createGroup('java4ever', 'public')
+        channel = self.db.lookupGroup('java4ever')
+        assert channel['name'] == 'java4ever'
+        assert channel['type'] == 'public'
+        assert channel['meta'] != {}
+
+        self.db.deleteGroup('java4ever')
+        self.db.createGroup('java4ever', 'public')
+        self.db.deleteGroup('java4ever')
+        self.db.createGroup('java4ever', 'public')
+        self.db.deleteGroup('java4ever')
+        self.db.createGroup('java4ever', 'public')
+        self.db.deleteGroup('java4ever')
+        self.db.createGroup('java4ever', 'public')
+        self.db.deleteGroup('java4ever')
+        self.db.createGroup('java4ever', 'public')
+        self.db.deleteGroup('java4ever')
+        self.db.createGroup('java4ever', 'public')
+        self.db.deleteGroup('java4ever')
+        self.db.createGroup('java4ever', 'public')
+        self.db.deleteGroup('java4ever')
+        self.db.createGroup('java4ever', 'public')
+        self.db.deleteGroup('java4ever')
+
+        channel = self.db.lookupGroup('java4ever')
+        assert channel is None
+
+        state = self.db.getGroupState('java4ever')
+        assert state is None
+
     def test_setGroupData(self):
         self.db.createGroup('test_channel', 'public')
         channel = self.db.lookupGroup('test_channel')
@@ -128,6 +188,11 @@ class TestIRCDDatabase():
         self.db.setGroupTopic('test_channel', 'baz', 'john_doe')
         self.db.setGroupTopic('test_channel', 'meh', 'john_doe')
         self.db.setGroupTopic('test_channel', 'test', 'john_doe')
+        self.db.setGroupTopic('test_channel', 'test', 'john_doe')
+        self.db.setGroupTopic('test_channel', 'foo', 'john_doe')
+        self.db.setGroupTopic('test_channel', 'baz', 'john_doe')
+        self.db.setGroupTopic('test_channel', 'meh', 'john_doe')
+        self.db.setGroupTopic('test_channel', 'test', 'john_doe')
         channel = self.db.lookupGroup('test_channel')
 
         assert channel['meta']['topic'] == 'test'
@@ -139,15 +204,33 @@ class TestIRCDDatabase():
 
         self.db.checkIfValidEmail(email)
 
+    def test_checkIfBadEmail(self):
+        email = "bademails"
+
+        with ShouldRaise(ValueError):
+            self.db.checkIfValidEmail(email)
+
     def test_checkIfValidNickname(self):
         nickname = "valid2013"
 
         self.db.checkIfValidNickname(nickname)
 
+    def test_checkIfBadNickname(self):
+        nickname = "@3"
+
+        with ShouldRaise(ValueError):
+            self.db.checkIfValidNickname(nickname)
+
     def test_checkIfValidPassword(self):
         password = "goodPassword2"
 
         self.db.checkIfValidPassword(password)
+
+    def test_checkIfBadPassword(self):
+        password = "bad"
+
+        with ShouldRaise(ValueError):
+            self.db.checkIfValidPassword(password)
 
     def test_heartbeatsUserSession(self):
         result = self.db.heartbeatUserSession("test_user")

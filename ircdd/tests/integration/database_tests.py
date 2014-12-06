@@ -3,6 +3,7 @@ from ircdd import database
 
 from ircdd.tests import integration
 
+
 class TestIRCDDatabase():
     def setUp(self):
         self.conn = r.connect(db=integration.DB,

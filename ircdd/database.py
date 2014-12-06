@@ -55,7 +55,7 @@ class IRCDDatabase:
 
     def heartbeatUserSession(self, nickname):
         """
-        A heart beat to keep track of the state of the 
+        A heart beat to keep track of the state of the
         user in a login session.
         """
         session = r.table(self.USER_SESSIONS_TABLE).get(
@@ -92,7 +92,7 @@ class IRCDDatabase:
 
     def heartbeatUserInGroup(self, nickname, group):
         """
-        A heart beat to keep track of the state of the 
+        A heart beat to keep track of the state of the
         user in a group.
         """
         presence = r.table(self.GROUP_STATES_TABLE).get(

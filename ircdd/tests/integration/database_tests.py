@@ -218,8 +218,7 @@ class TestIRCDDatabase():
     def test_checkIfBadNickname(self):
         nickname = "@3"
 
-        with ShouldRaise(ValueError):
-            self.db.checkIfValidNickname(nickname)
+        assertRaises(ValueError, self.db.checkIfValidNickname, nickname)
 
     def test_checkIfValidPassword(self):
         password = "goodPassword2"

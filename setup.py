@@ -18,5 +18,5 @@ setup(name="ircdd",
                         "testfixtures"],
       packages=find_packages(),
       scripts=["bin/ircdd.sh", ],
-      test_suite="nosetests", "testfixtures", 
+      test_suite="nosetests",
       )

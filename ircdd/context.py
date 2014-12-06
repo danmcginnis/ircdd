@@ -23,9 +23,8 @@ class ConfigStore(dict):
 def makeContext(config):
     """
     Constructs an initialized context from the config values.
-    Returns:
-        A dict mapping keys to available resources,
-        including the original config values.
+    Returns a dict mapping keys to available resources,
+    including the original config values.
     """
 
     ctx = ConfigStore()

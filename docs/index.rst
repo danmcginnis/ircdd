@@ -17,6 +17,7 @@ Contents:
    security
    database
    functions
+   apidocs
    recovery
    errors
    troubleshoot
@@ -40,4 +41,3 @@ Credits
    
 :Github:
    `Repo <https://github.com/kzvezdarov/ircdd>`_
-

@@ -40,7 +40,6 @@ def makeServer(ctx):
     :param ctx: a :class:`ircdd.context.ConfigStore` object that
     contains both the raw config values and the initialized shared
     drivers.
-
     """
     f = IRCDDFactory(ctx)
     IRCDDUser.ctx = ctx

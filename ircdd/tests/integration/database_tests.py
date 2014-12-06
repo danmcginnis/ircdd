@@ -2,8 +2,6 @@ import rethinkdb as r
 from ircdd import database
 
 from ircdd.tests import integration
-import unittest
-
 
 class TestIRCDDatabase():
     def setUp(self):
@@ -204,32 +202,15 @@ class TestIRCDDatabase():
 
         self.db.checkIfValidEmail(email)
 
-    def test_checkIfBadEmail(self):
-        email = "bademails"
-
-        with ShouldRaise(ValueError):
-            self.db.checkIfValidEmail(email)
-
     def test_checkIfValidNickname(self):
         nickname = "valid2013"
 
         self.db.checkIfValidNickname(nickname)
 
-    def test_checkIfBadNickname(self):
-        nickname = "@3"
-
-        unittest.assertRaises(ValueError, self.db.checkIfValidNickname, nickname)
-
     def test_checkIfValidPassword(self):
         password = "goodPassword2"
 
         self.db.checkIfValidPassword(password)
-
-    def test_checkIfBadPassword(self):
-        password = "bad"
-
-        with ShouldRaise(ValueError):
-            self.db.checkIfValidPassword(password)
 
     def test_heartbeatsUserSession(self):
         result = self.db.heartbeatUserSession("test_user")

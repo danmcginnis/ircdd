@@ -17,5 +17,5 @@ setup(name="ircdd",
       setup_requires=["flake8", "nose", "mock", "responses"],
       packages=find_packages(),
       scripts=["bin/ircdd.sh", ],
-      test_suite="nosetests",
+      test_suite="nosetests", "testfixtures",
       )
